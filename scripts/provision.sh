@@ -112,55 +112,57 @@ done
 
 LOGGEDIN_USER=$(oc $ARG_OC_OPS whoami)
 OPENSHIFT_USER=${ARG_USERNAME:-$LOGGEDIN_USER}
-PRJ_SUFFIX=${ARG_PROJECT_SUFFIX:-`echo $OPENSHIFT_USER | sed -e 's/[-@].*//g'`}
+PRJ_SUFFIX=cicd
 GITHUB_ACCOUNT=${GITHUB_ACCOUNT:-OpenShiftDemos}
 GITHUB_REF=${GITHUB_REF:-ocp-3.9}
 
 function deploy() {
   oc $ARG_OC_OPS new-project dev-$PRJ_SUFFIX   --display-name="Tasks - Dev"
   oc $ARG_OC_OPS new-project stage-$PRJ_SUFFIX --display-name="Tasks - Stage"
-  oc $ARG_OC_OPS new-project cicd-$PRJ_SUFFIX  --display-name="CI/CD"
+  oc $ARG_OC_OPS new-project cicd  --display-name="CI/CD"
 
   sleep 2
 
-  oc $ARG_OC_OPS policy add-role-to-user edit system:serviceaccount:cicd-$PRJ_SUFFIX:jenkins -n dev-$PRJ_SUFFIX
-  oc $ARG_OC_OPS policy add-role-to-user edit system:serviceaccount:cicd-$PRJ_SUFFIX:jenkins -n stage-$PRJ_SUFFIX
+  oc $ARG_OC_OPS policy add-role-to-user edit system:serviceaccount:cicd:jenkins -n dev-$PRJ_SUFFIX
+  oc $ARG_OC_OPS policy add-role-to-user edit system:serviceaccount:cicd:jenkins -n stage-$PRJ_SUFFIX
+  oc $ARG_OC_OPS policy add-role-to-user system:image-puller system:serviceaccount:dev-$PRJ_SUFFIX:default 
 
-  if [ $LOGGEDIN_USER == 'system:admin' ] ; then
+
+ # if [ $LOGGEDIN_USER == 'system:admin' ] ; then
     oc $ARG_OC_OPS adm policy add-role-to-user admin $ARG_USERNAME -n dev-$PRJ_SUFFIX >/dev/null 2>&1
     oc $ARG_OC_OPS adm policy add-role-to-user admin $ARG_USERNAME -n stage-$PRJ_SUFFIX >/dev/null 2>&1
-    oc $ARG_OC_OPS adm policy add-role-to-user admin $ARG_USERNAME -n cicd-$PRJ_SUFFIX >/dev/null 2>&1
+    oc $ARG_OC_OPS adm policy add-role-to-user admin $ARG_USERNAME -n cicd >/dev/null 2>&1
     
     oc $ARG_OC_OPS annotate --overwrite namespace dev-$PRJ_SUFFIX   demo=openshift-cd-$PRJ_SUFFIX >/dev/null 2>&1
     oc $ARG_OC_OPS annotate --overwrite namespace stage-$PRJ_SUFFIX demo=openshift-cd-$PRJ_SUFFIX >/dev/null 2>&1
-    oc $ARG_OC_OPS annotate --overwrite namespace cicd-$PRJ_SUFFIX  demo=openshift-cd-$PRJ_SUFFIX >/dev/null 2>&1
+    oc $ARG_OC_OPS annotate --overwrite namespace cicd  demo=openshift-cd-$PRJ_SUFFIX >/dev/null 2>&1
 
-    oc $ARG_OC_OPS adm pod-network join-projects --to=cicd-$PRJ_SUFFIX dev-$PRJ_SUFFIX stage-$PRJ_SUFFIX >/dev/null 2>&1
-  fi
+    oc $ARG_OC_OPS adm pod-network join-projects --to=cicd dev-$PRJ_SUFFIX stage-$PRJ_SUFFIX >/dev/null 2>&1
+ # fi
 
   sleep 2
 
-  oc new-app jenkins-ephemeral -n cicd-$PRJ_SUFFIX
+  oc new-app jenkins-persistent-ha -n cicd
 
   sleep 2
 
   local template=https://raw.githubusercontent.com/$GITHUB_ACCOUNT/openshift-cd-demo/$GITHUB_REF/cicd-template.yaml
   echo "Using template $template"
-  oc $ARG_OC_OPS new-app -f $template --param DEV_PROJECT=dev-$PRJ_SUFFIX --param STAGE_PROJECT=stage-$PRJ_SUFFIX --param=WITH_CHE=$ARG_DEPLOY_CHE --param=EPHEMERAL=$ARG_EPHEMERAL -n cicd-$PRJ_SUFFIX 
+  oc $ARG_OC_OPS new-app -f /home/ec2-user/openshift-cd-demo/cicd-template.yaml --param DEV_PROJECT=dev-$PRJ_SUFFIX --param STAGE_PROJECT=stage-$PRJ_SUFFIX --param=WITH_CHE=$ARG_DEPLOY_CHE --param=EPHEMERAL=$ARG_EPHEMERAL -n cicd 
 }
 
 function make_idle() {
   echo_header "Idling Services"
   oc $ARG_OC_OPS idle -n dev-$PRJ_SUFFIX --all
   oc $ARG_OC_OPS idle -n stage-$PRJ_SUFFIX --all
-  oc $ARG_OC_OPS idle -n cicd-$PRJ_SUFFIX --all
+  oc $ARG_OC_OPS idle -n cicd --all
 }
 
 function make_unidle() {
   echo_header "Unidling Services"
   local _DIGIT_REGEX="^[[:digit:]]*$"
 
-  for project in dev-$PRJ_SUFFIX stage-$PRJ_SUFFIX cicd-$PRJ_SUFFIX
+  for project in dev-$PRJ_SUFFIX stage-$PRJ_SUFFIX cicd
   do
     for dc in $(oc $ARG_OC_OPS get dc -n $project -o=custom-columns=:.metadata.name); do
       local replicas=$(oc $ARG_OC_OPS get dc $dc --template='{{ index .metadata.annotations "idling.alpha.openshift.io/previous-scale"}}' -n $project 2>/dev/null)
@@ -217,7 +219,7 @@ echo_header "OpenShift CI/CD Demo ($(date))"
 case "$ARG_COMMAND" in
     delete)
         echo "Delete demo..."
-        oc $ARG_OC_OPS delete project dev-$PRJ_SUFFIX stage-$PRJ_SUFFIX cicd-$PRJ_SUFFIX
+        oc $ARG_OC_OPS delete project dev-$PRJ_SUFFIX stage-$PRJ_SUFFIX cicd
         echo
         echo "Delete completed successfully!"
         ;;
