@@ -138,13 +138,8 @@ function deploy() {
     oc $ARG_OC_OPS adm pod-network join-projects --to=cicd-$PRJ_SUFFIX dev-$PRJ_SUFFIX stage-$PRJ_SUFFIX >/dev/null 2>&1
   fi
 
-  sleep 2
 
-  oc import-image jenkins:v3.7 --from="registry.access.redhat.com/openshift3/jenkins-2-rhel7" --confirm -n openshift 2>/dev/null
 
-  sleep 5
-
-  oc tag jenkins:v3.7 jenkins:latest -n openshift
   oc new-app jenkins-ephemeral -n cicd-$PRJ_SUFFIX
 
   sleep 2
