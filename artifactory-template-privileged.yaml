@@ -1,0 +1,156 @@
+apiVersion: v1
+kind: Template
+message: An Artifactory service has been created in your project.  Log into Artifactory with
+  the default credentials of admin/password.
+metadata:
+  creationTimestamp: null
+  name: artifactory-persistent
+  annotations:
+    description: |-
+      An OpenShift Template for JFrog Artifactory.
+      You must have persistent volumes available in your cluster to use this template.
+    iconClass: icon-openjdk
+    tags: maven,artifactory,instant-app
+  
+parameters:
+- description: The name of the OpenShift Service exposed for the Artifactory container
+  displayName: Artifactory Service Name
+  name: ARTIFACTORY_SERVICE
+  value: artifactory
+  required: true
+
+- description: Volume space available for data, e.g. 512Mi, 2Gi.
+  displayName: Persistent Volume Claim Capacity
+  name: VOLUME_CAPACITY
+  value: 2Gi
+  required: true
+  
+- description: Service Account with AnyUID SCC assigned. Will be created if it doesn't exist
+  displayName: Artifactory Service Account
+  name: ARTIFACTORY_SERVICE_ACCOUNT
+  value: artifactory-sa
+  required: true
+  
+- description: Image on which to base the Artifactory Image Stream
+  displayName: Artifactory Image
+  name: ARTIFACTORY_IMAGE
+  value: docker.bintray.io/jfrog/artifactory-oss:latest
+  required: true
+
+objects:
+- apiVersion: v1
+  kind: ServiceAccount
+  metadata:
+    name: ${ARTIFACTORY_SERVICE_ACCOUNT}
+
+- apiVersion: v1
+  kind: PersistentVolumeClaim
+  metadata:
+    name: ${ARTIFACTORY_SERVICE}
+  spec:
+    accessModes:
+    - ReadWriteOnce
+    resources:
+      requests:
+        storage: ${VOLUME_CAPACITY}
+        
+- apiVersion: v1
+  kind: DeploymentConfig
+  metadata:
+    name: ${ARTIFACTORY_SERVICE}
+  spec:
+    replicas: 1
+    selector:
+      name: ${ARTIFACTORY_SERVICE}
+    strategy:
+      resources: {}
+      rollingParams:
+        intervalSeconds: 1
+        maxSurge: 25%
+        maxUnavailable: 25%
+        timeoutSeconds: 600
+        updatePeriodSeconds: 1
+      type: Rolling
+    template:
+      metadata:
+        annotations:
+        creationTimestamp: null
+        labels:
+          name: ${ARTIFACTORY_SERVICE}
+      spec:
+        containers:
+        - image: 
+          imagePullPolicy: IfNotPresent
+          name: ${ARTIFACTORY_SERVICE}
+          ports:
+          - containerPort: 8081
+            protocol: TCP
+          resources: {}
+          terminationMessagePath: /dev/termination-log
+          volumeMounts:
+          - mountPath: /var/opt/jfrog/artifactory/data
+            name: ${ARTIFACTORY_SERVICE}
+        dnsPolicy: ClusterFirst
+        restartPolicy: Always
+        securityContext: {}
+        serviceAccount: ${ARTIFACTORY_SERVICE_ACCOUNT}
+        serviceAccountName: ${ARTIFACTORY_SERVICE_ACCOUNT}
+        terminationGracePeriodSeconds: 30
+        volumes:
+        - name: ${ARTIFACTORY_SERVICE}
+          persistentVolumeClaim:
+            claimName: ${ARTIFACTORY_SERVICE}
+    test: false
+    triggers:
+    - type: ConfigChange
+    - imageChangeParams:
+        automatic: true
+        containerNames:
+        - ${ARTIFACTORY_SERVICE}
+        from:
+          kind: ImageStreamTag
+          name: ${ARTIFACTORY_SERVICE}:latest
+      type: ImageChange
+      
+- apiVersion: v1
+  kind: ImageStream
+  metadata:
+    creationTimestamp: null
+    generation: 1
+    name: ${ARTIFACTORY_SERVICE}
+  spec:
+    tags:
+    - annotations: null
+      from:
+        kind: DockerImage
+        name: ${ARTIFACTORY_IMAGE}
+      generation: 1
+      importPolicy:
+        insecure: true
+      name: latest
+      
+- apiVersion: v1
+  kind: Route
+  metadata:
+    name: ${ARTIFACTORY_SERVICE}
+  spec:
+    to:
+      kind: Service
+      name: ${ARTIFACTORY_SERVICE}
+
+- apiVersion: v1
+  kind: Service
+  metadata:
+    name: ${ARTIFACTORY_SERVICE}
+  spec:
+    ports:
+    - name: 8081-tcp
+      port: 8081
+      protocol: TCP
+      targetPort: 8081
+    selector:
+      deploymentconfig: ${ARTIFACTORY_SERVICE}
+    sessionAffinity: None
+    type: ClusterIP
+  status:
+    loadBalancer: {}
