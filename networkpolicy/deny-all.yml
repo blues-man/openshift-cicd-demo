@@ -1,0 +1,8 @@
+kind: NetworkPolicy
+apiVersion: extensions/v1beta1
+metadata:
+  name: deny-all
+spec:
+  podSelector:
+  ingress: []
+

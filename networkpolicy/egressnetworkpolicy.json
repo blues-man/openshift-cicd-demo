@@ -1,0 +1,30 @@
+{
+    "kind": "EgressNetworkPolicy",
+    "apiVersion": "v1",
+    "metadata": {
+        "name": "poc-sample"
+    },
+    "spec": {
+        "egress": [
+            {
+                "type": "Allow",
+                "to": {
+                    "cidrSelector": "178.63.80.9/32"
+                }
+            },
+            {
+                "type": "Allow",
+                "to": {
+                    "dnsName": "bitbucket.org"
+                }
+            },
+            {
+                "type": "Deny",
+                "to": {
+                    "cidrSelector": "0.0.0.0/0"
+                }
+            }
+        ]
+    }
+}
+
