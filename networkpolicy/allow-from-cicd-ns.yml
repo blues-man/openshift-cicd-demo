@@ -1,0 +1,11 @@
+apiVersion: extensions/v1beta1
+kind: NetworkPolicy
+metadata:
+  name: allow-from-cicd-namespace
+spec:
+  podSelector:
+  ingress:
+  - from:
+    - namespaceSelector:
+        matchLabels:
+          name: cicd

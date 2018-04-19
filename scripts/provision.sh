@@ -126,7 +126,8 @@ function deploy() {
   oc $ARG_OC_OPS policy add-role-to-user edit system:serviceaccount:cicd:jenkins -n dev-$PRJ_SUFFIX
   oc $ARG_OC_OPS policy add-role-to-user edit system:serviceaccount:cicd:jenkins -n stage-$PRJ_SUFFIX
   oc $ARG_OC_OPS policy add-role-to-user system:image-puller system:serviceaccount:dev-$PRJ_SUFFIX:default 
-
+  oc $ARG_OC_OPS policy add-role-to-user edit system:serviceaccount:dev-$PRJ_SUFFIX:default -n dev-$PRJ_SUFFIX
+  oc $ARG_OC_OPS policy add-role-to-user edit system:serviceaccount:dev-$PRJ_SUFFIX:default -n stage-$PRJ_SUFFIX
 
  # if [ $LOGGEDIN_USER == 'system:admin' ] ; then
     oc $ARG_OC_OPS adm policy add-role-to-user admin $ARG_USERNAME -n dev-$PRJ_SUFFIX >/dev/null 2>&1
@@ -136,8 +137,16 @@ function deploy() {
     oc $ARG_OC_OPS annotate --overwrite namespace dev-$PRJ_SUFFIX   demo=openshift-cd-$PRJ_SUFFIX >/dev/null 2>&1
     oc $ARG_OC_OPS annotate --overwrite namespace stage-$PRJ_SUFFIX demo=openshift-cd-$PRJ_SUFFIX >/dev/null 2>&1
     oc $ARG_OC_OPS annotate --overwrite namespace cicd  demo=openshift-cd-$PRJ_SUFFIX >/dev/null 2>&1
+    oc $ARG_OC_OPS label namespace dev-$PRJ_SUFFIX name=dev --overwrite >/dev/null 2>&1
+    oc $ARG_OC_OPS label namespace stage-$PRJ_SUFFIX name=stage --overwrite >/dev/null 2>&1
+    oc $ARG_OC_OPS label namespace cicd name=cicd --overwrite >/dev/null 2>&1
+    #oc $ARG_OC_OPS adm pod-network join-projects --to=cicd dev-$PRJ_SUFFIX stage-$PRJ_SUFFIX >/dev/null 2>&1
+    oc $ARG_OC_OPS create -f https://github.com/blues-man/openshift-cicd-demo/blob/edp-3.9/networkpolicy/allow-from-cicd-ns.yml -n dev-$PRJ_SUFFIX >/dev/null 2>&1
+    oc $ARG_OC_OPS create -f https://github.com/blues-man/openshift-cicd-demo/blob/edp-3.9/networkpolicy/allow-from-cicd-ns.yml  -n stage-$PRJ_SUFFIX >/dev/null 2>&1
+    oc $ARG_OC_OPS create -f https://github.com/blues-man/openshift-cicd-demo/blob/edp-3.9/networkpolicy/allow-from-dev-ns.yml  -n stage-$PRJ_SUFFIX >/dev/null 2>&1
 
-    oc $ARG_OC_OPS adm pod-network join-projects --to=cicd dev-$PRJ_SUFFIX stage-$PRJ_SUFFIX >/dev/null 2>&1
+
+
  # fi
 
   sleep 2
@@ -146,9 +155,9 @@ function deploy() {
 
   sleep 2
 
-  local template=https://raw.githubusercontent.com/$GITHUB_ACCOUNT/openshift-cd-demo/$GITHUB_REF/cicd-template.yaml
+  local template=https://github.com/blues-man/openshift-cicd-demo/blob/edp-3.9/cicd-template.yaml
   echo "Using template $template"
-  oc $ARG_OC_OPS new-app -f /home/ec2-user/openshift-cd-demo/cicd-template.yaml --param DEV_PROJECT=dev-$PRJ_SUFFIX --param STAGE_PROJECT=stage-$PRJ_SUFFIX --param=WITH_CHE=$ARG_DEPLOY_CHE --param=EPHEMERAL=$ARG_EPHEMERAL -n cicd 
+  oc $ARG_OC_OPS new-app -f $template --param DEV_PROJECT=dev-$PRJ_SUFFIX --param STAGE_PROJECT=stage-$PRJ_SUFFIX --param=WITH_CHE=$ARG_DEPLOY_CHE --param=EPHEMERAL=$ARG_EPHEMERAL -n cicd 
 }
 
 function make_idle() {

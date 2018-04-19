@@ -1,0 +1,11 @@
+apiVersion: extensions/v1beta1
+kind: NetworkPolicy
+metadata:
+  name: allow-from-dev-namespace
+spec:
+  podSelector:
+  ingress:
+  - from:
+    - namespaceSelector:
+        matchLabels:
+          name: dev
