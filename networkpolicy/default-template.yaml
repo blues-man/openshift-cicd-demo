@@ -11,6 +11,7 @@ objects:
       openshift.io/description: ${PROJECT_DESCRIPTION}
       openshift.io/display-name: ${PROJECT_DISPLAYNAME}
       openshift.io/requester: ${PROJECT_REQUESTING_USER}
+      name: ${PROJECT_NAME}
     creationTimestamp: null
     name: ${PROJECT_NAME}
   spec: {}
